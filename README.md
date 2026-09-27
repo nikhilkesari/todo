@@ -69,16 +69,19 @@ GEMINI_API_KEY=your_google_gemini_api_key
 PORT=3001
 ```
 
-### Development
-Start both the Express backend proxy and the Vite development server:
+### Development (Single Command)
+Run both the Express backend proxy and the Vite React frontend concurrently with a single command:
 ```bash
-# Terminal 1: Start Express Backend Proxy
-pnpm run server
-
-# Terminal 2: Start Vite Dev Server
-pnpm run dev
+pnpm dev
+# or
+pnpm start
 ```
-Open [http://localhost:5173](http://localhost:5173) in your browser.
+
+This starts:
+- **React Frontend**: [http://localhost:5173](http://localhost:5173)
+- **Express Backend Proxy**: [http://localhost:3001](http://localhost:3001)
+
+*(If you ever need to run them separately in individual terminals, you can use `pnpm run dev:server` and `pnpm run dev:client`)*
 
 ---
 
