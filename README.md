@@ -46,7 +46,7 @@ A high-trust, responsive React + TypeScript Todo application styled with Tailwin
 
 ### Prerequisites
 - Node.js 20+ (recommended Node 22)
-- npm 10+
+- pnpm 9+ or 10+ (`corepack enable pnpm`)
 
 ### Installation
 ```bash
@@ -54,8 +54,8 @@ A high-trust, responsive React + TypeScript Todo application styled with Tailwin
 git clone https://github.com/nikhilkesari/todo.git
 cd todo
 
-# Install dependencies
-npm install
+# Install dependencies using pnpm
+pnpm install
 ```
 
 ### Environment Configuration
@@ -73,10 +73,10 @@ PORT=3001
 Start both the Express backend proxy and the Vite development server:
 ```bash
 # Terminal 1: Start Express Backend Proxy
-npm run server
+pnpm run server
 
 # Terminal 2: Start Vite Dev Server
-npm run dev
+pnpm run dev
 ```
 Open [http://localhost:5173](http://localhost:5173) in your browser.
 
@@ -87,26 +87,26 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 ### Static Analysis
 ```bash
 # Run ESLint (Flat Config)
-npm run lint
+pnpm run lint
 
 # Run TypeScript Strict Typecheck
-npm run typecheck
+pnpm run typecheck
 ```
 
 ### Unit & Integration Tests (Vitest)
 ```bash
-npm test
+pnpm test
 ```
 
 ### End-to-End & Chrome DevTools Protocol Tests (Playwright)
 ```bash
 # Run full 30-test suite (includes CDP storage verification)
-npm run test:e2e
+pnpm run test:e2e
 ```
 
 ### Production Build
 ```bash
-npm run build
+pnpm run build
 ```
 
 ---
