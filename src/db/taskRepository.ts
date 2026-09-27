@@ -67,8 +67,11 @@ export class TaskRepository {
 
   async toggleComplete(id: string): Promise<Task> {
     const db = await getDatabase();
-    const existing = await db.get('tasks', id);
+    const tx = db.transaction('tasks', 'readwrite');
+    const store = tx.objectStore('tasks');
+    const existing = await store.get(id);
     if (!existing) {
+      await tx.done;
       throw new Error(`Task with id ${id} not found`);
     }
 
@@ -78,7 +81,8 @@ export class TaskRepository {
       updatedAt: new Date().toISOString(),
     };
 
-    await db.put('tasks', updatedTask);
+    await store.put(updatedTask);
+    await tx.done;
     return updatedTask;
   }
 

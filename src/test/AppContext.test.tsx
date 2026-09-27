@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { render, screen, act, waitFor } from '@testing-library/react';
 import { AppProvider, useApp } from '../context/AppContext';
 import { closeDatabase, DB_NAME } from '../db/database';
+import { taskRepository } from '../db/taskRepository';
 import { getTodayDateString } from '../utils/dateUtils';
 
 const TestConsumer: React.FC = () => {
@@ -31,7 +32,7 @@ const TestConsumer: React.FC = () => {
 
       <button
         data-testid="add-btn"
-        onClick={() => addTask({ title: 'New Test Task', dueDate: getTodayDateString() })}
+        onClick={async () => { await addTask({ title: 'New Test Task', dueDate: getTodayDateString() }); }}
       >
         Add Task
       </button>
@@ -40,10 +41,10 @@ const TestConsumer: React.FC = () => {
         <div key={task.id} data-testid={`test-task-${task.id}`}>
           <span data-testid={`title-${task.id}`}>{task.title}</span>
           <span data-testid={`status-${task.id}`}>{task.completed ? 'done' : 'pending'}</span>
-          <button data-testid={`toggle-${task.id}`} onClick={() => toggleTask(task.id)}>
+          <button data-testid={`toggle-${task.id}`} onClick={async () => { await toggleTask(task.id); }}>
             Toggle
           </button>
-          <button data-testid={`delete-${task.id}`} onClick={() => deleteTask(task.id)}>
+          <button data-testid={`delete-${task.id}`} onClick={async () => { await deleteTask(task.id); }}>
             Delete
           </button>
         </div>
@@ -61,7 +62,7 @@ const TestConsumer: React.FC = () => {
 
 describe('AppContext & AppProvider', () => {
   beforeEach(async () => {
-    closeDatabase();
+    await closeDatabase();
     await new Promise<void>((resolve, reject) => {
       const req = indexedDB.deleteDatabase(DB_NAME);
       req.onsuccess = () => resolve();
@@ -69,8 +70,8 @@ describe('AppContext & AppProvider', () => {
     });
   });
 
-  afterEach(() => {
-    closeDatabase();
+  afterEach(async () => {
+    await closeDatabase();
   });
 
   it('initializes database with seed projects and tasks on first launch', async () => {
@@ -111,6 +112,11 @@ describe('AppContext & AppProvider', () => {
     const newCount = Number(screen.getByTestId('task-count').textContent);
     expect(newCount).toBe(initialCount + 1);
     expect(screen.getByText('New Test Task')).toBeInTheDocument();
+
+    await waitFor(async () => {
+      const all = await taskRepository.getAll();
+      expect(all.some((t) => t.title === 'New Test Task')).toBe(true);
+    });
   });
 
   it('optimistically toggles task completion', async () => {
@@ -133,6 +139,11 @@ describe('AppContext & AppProvider', () => {
     });
 
     expect(screen.getByTestId('status-task-welcome').textContent).toBe('done');
+
+    await waitFor(async () => {
+      const persisted = await taskRepository.getById('task-welcome');
+      expect(persisted?.completed).toBe(true);
+    });
   });
 
   it('optimistically deletes a task', async () => {
@@ -156,6 +167,11 @@ describe('AppContext & AppProvider', () => {
     const afterCount = Number(screen.getByTestId('task-count').textContent);
     expect(afterCount).toBe(initialCount - 1);
     expect(screen.queryByTestId('test-task-task-welcome')).not.toBeInTheDocument();
+
+    await waitFor(async () => {
+      const persisted = await taskRepository.getById('task-welcome');
+      expect(persisted).toBeUndefined();
+    });
   });
 
   it('filters tasks when quickFilter changes', async () => {

@@ -1,0 +1,99 @@
+name: Bugbot Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      base_ref:
+        description: 'Base Git ref to compare against (e.g. HEAD~1)'
+        required: false
+        default: 'HEAD~1'
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: bugbot-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    name: 🤖 Gemini Bugbot Review
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js runtime
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Extract Code Changes Diff
+        id: extract_diff
+        run: |
+          mkdir -p .github/temp
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git fetch origin ${{ github.base_ref }} --depth=50
+            git diff origin/${{ github.base_ref }}...HEAD \
+              -- ':(exclude)*.lock' \
+              -- ':(exclude)*-lock.json' \
+              -- ':(exclude)dist/**' \
+              -- ':(exclude)build/**' \
+              -- ':(exclude).agents/**' \
+              -- ':(exclude)coverage/**' \
+              -- ':(exclude)playwright-report/**' \
+              -- ':(exclude)test-results/**' \
+              -- ':(exclude)*.svg' \
+              -- ':(exclude)*.png' \
+              -- ':(exclude)*.jpg' > .github/temp/changes.diff
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.base_ref }}" ]; then
+            git diff ${{ github.event.inputs.base_ref }}...HEAD \
+              -- ':(exclude)*.lock' \
+              -- ':(exclude)*-lock.json' \
+              -- ':(exclude)dist/**' \
+              -- ':(exclude)build/**' \
+              -- ':(exclude).agents/**' \
+              -- ':(exclude)coverage/**' > .github/temp/changes.diff
+          else
+            # For push events to main
+            if git rev-parse --verify HEAD~1 >/dev/null 2>&1; then
+              git diff HEAD~1...HEAD \
+                -- ':(exclude)*.lock' \
+                -- ':(exclude)*-lock.json' \
+                -- ':(exclude)dist/**' \
+                -- ':(exclude)build/**' \
+                -- ':(exclude).agents/**' \
+                -- ':(exclude)coverage/**' > .github/temp/changes.diff
+            else
+              git diff 4b825dc642cb6eb9a060e54bf8d69288fbee4904...HEAD \
+                -- ':(exclude)*.lock' \
+                -- ':(exclude)*-lock.json' \
+                -- ':(exclude)dist/**' \
+                -- ':(exclude)build/**' \
+                -- ':(exclude).agents/**' > .github/temp/changes.diff
+            fi
+          fi
+
+          DIFF_SIZE=$(wc -c < .github/temp/changes.diff)
+          echo "diff_size=$DIFF_SIZE" >> $GITHUB_OUTPUT
+          echo "Extracted diff size: $DIFF_SIZE bytes"
+
+      - name: Run Gemini Bugbot Reviewer
+        id: run_bugbot
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          EVENT_NAME: ${{ github.event_name }}
+          REPO_NAME: ${{ github.repository }}
+          DIFF_FILE: .github/temp/changes.diff
+        run: |
+          node scripts/bugbot.mjs

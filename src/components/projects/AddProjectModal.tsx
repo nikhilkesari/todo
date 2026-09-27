@@ -21,6 +21,17 @@ export const AddProjectModal: React.FC = () => {
   const [color, setColor] = useState(PRESET_COLORS[0]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  React.useEffect(() => {
+    if (!isProjectModalOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsProjectModalOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isProjectModalOpen, setIsProjectModalOpen]);
+
   if (!isProjectModalOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {

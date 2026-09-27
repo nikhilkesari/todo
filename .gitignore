@@ -3,3 +3,17 @@ dist
 dist-ssr
 *.local
 .DS_Store
+
+# Test reports & artifacts
+playwright-report
+test-results
+coverage
+.github/temp
+
+# Agent scratch & logs
+.agents
+
+# Environment variables
+.env
+.env.*
+!.env.example

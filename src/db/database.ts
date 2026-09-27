@@ -31,8 +31,14 @@ export const DB_NAME = 'todo_app_db';
 export const DB_VERSION = 1;
 
 let dbPromise: Promise<IDBPDatabase<TodoDBSchema>> | null = null;
+let closePromise: Promise<void> | null = null;
 
-export function getDatabase(): Promise<IDBPDatabase<TodoDBSchema>> {
+export async function getDatabase(): Promise<IDBPDatabase<TodoDBSchema>> {
+  // If a database shutdown is currently underway, wait for it to complete
+  if (closePromise) {
+    await closePromise;
+  }
+
   if (!dbPromise) {
     dbPromise = openDB<TodoDBSchema>(DB_NAME, DB_VERSION, {
       upgrade(db) {
@@ -58,14 +64,37 @@ export function getDatabase(): Promise<IDBPDatabase<TodoDBSchema>> {
           db.createObjectStore('settings', { keyPath: 'key' });
         }
       },
+    }).catch((err) => {
+      dbPromise = null;
+      throw err;
     });
   }
   return dbPromise;
 }
 
-export function closeDatabase(): void {
-  if (dbPromise) {
-    dbPromise.then((db) => db.close()).catch(() => {});
-    dbPromise = null;
+export async function closeDatabase(): Promise<void> {
+  // If already closing, return the in-flight close promise
+  if (closePromise) {
+    return closePromise;
   }
+
+  if (!dbPromise) {
+    return;
+  }
+
+  const currentDbPromise = dbPromise;
+  dbPromise = null;
+
+  closePromise = (async () => {
+    try {
+      const db = await currentDbPromise;
+      db.close();
+    } catch {
+      // Ignore open or abort errors during teardown
+    } finally {
+      closePromise = null;
+    }
+  })();
+
+  return closePromise;
 }

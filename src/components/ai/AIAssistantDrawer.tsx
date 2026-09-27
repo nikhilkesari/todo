@@ -1,14 +1,31 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Sparkles, X, Calendar, AlertTriangle, ArrowRight } from 'lucide-react';
 import { cn } from '../../utils/cn';
+import { aiService, WorkloadAnalysisResult } from '../../services/aiService';
 
 export const AIAssistantDrawer: React.FC = () => {
   const { isAIDrawerOpen, setIsAIDrawerOpen, taskCounts, tasks, batchReschedule } = useApp();
+  const [analysis, setAnalysis] = useState<WorkloadAnalysisResult | null>(null);
+
+  useEffect(() => {
+    if (!isAIDrawerOpen) return;
+    let isMounted = true;
+    aiService.analyzeWorkload(tasks)
+      .then((res) => {
+        if (isMounted) {
+          setAnalysis(res);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      isMounted = false;
+    };
+  }, [isAIDrawerOpen, tasks]);
 
   if (!isAIDrawerOpen) return null;
 
-  const isOvercommitted = taskCounts.today >= 4;
+  const isOvercommitted = taskCounts.today >= 4 || analysis?.workloadLevel === 'overcommitted';
 
   const handleQuickRebalance = async () => {
     // Rebalance: move lowest priority today tasks to tomorrow
@@ -19,6 +36,13 @@ export const AIAssistantDrawer: React.FC = () => {
       const tomorrowStr = tomorrow.toISOString().split('T')[0];
       const suggestions = todayTasks.map((t) => ({ taskId: t.id, newDueDate: tomorrowStr }));
       await batchReschedule(suggestions);
+    } else {
+      const suggestions = await aiService.getRescheduleSuggestions(tasks);
+      if (suggestions.length > 0) {
+        await batchReschedule(
+          suggestions.map((s) => ({ taskId: s.taskId, newDueDate: s.suggestedDate }))
+        );
+      }
     }
   };
 
@@ -78,9 +102,10 @@ export const AIAssistantDrawer: React.FC = () => {
             )}
           </div>
           <p className="mt-1 text-xs opacity-90">
-            {isOvercommitted
-              ? `You have ${taskCounts.today} tasks due today. Consider rescheduling lower priority items to avoid burnout.`
-              : `Your schedule looks optimal with ${taskCounts.today} tasks due today.`}
+            {analysis?.summary ||
+              (isOvercommitted
+                ? `You have ${taskCounts.today} tasks due today. Consider rescheduling lower priority items to avoid burnout.`
+                : `Your schedule looks optimal with ${taskCounts.today} tasks due today.`)}
           </p>
           {isOvercommitted && (
             <button
@@ -126,6 +151,29 @@ export const AIAssistantDrawer: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* AI Recommendations List */}
+        {analysis?.recommendations && analysis.recommendations.length > 0 && (
+          <div data-testid="ai-recommendations-list" className="space-y-2">
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+              AI Recommendations
+            </h4>
+            {analysis.recommendations.map((rec) => (
+              <div
+                key={rec.id}
+                className="p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-xs space-y-1"
+              >
+                <div className="flex items-center justify-between font-medium text-slate-800">
+                  <span className="truncate">{rec.taskTitle}</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-semibold">
+                    {rec.action}
+                  </span>
+                </div>
+                <p className="text-slate-500 text-[11px]">{rec.reason}</p>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
