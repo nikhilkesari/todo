@@ -6,8 +6,8 @@ A high-trust, responsive React + TypeScript Todo application styled with Tailwin
 ![React](https://img.shields.io/badge/React-18-blue.svg)
 ![TypeScript](https://img.shields.io/badge/TypeScript-Strict-blue.svg)
 ![Tailwind](https://img.shields.io/badge/TailwindCSS-v3-38B2AC.svg)
-![Playwright](https://img.shields.io/badge/Playwright-CDP-green.svg)
-![Vitest](https://img.shields.io/badge/Vitest-34%2F34%20Pass-brightgreen.svg)
+![Playwright](https://img.shields.io/badge/Playwright-35%2F35%20Pass-green.svg)
+![Vitest](https://img.shields.io/badge/Vitest-44%2F44%20Pass-brightgreen.svg)
 
 ---
 
@@ -20,13 +20,22 @@ A high-trust, responsive React + TypeScript Todo application styled with Tailwin
 - **Temporal Quick Filters**: Filter by *Today*, *Upcoming*, *Overdue*, and *All*.
 - **Client Persistence**: 100% client-side persistence in browser IndexedDB (`todo_app_db`) via `idb` with 5 indexed keypaths for fast offline queries.
 
-### 2. Google Gemini AI Workload Advisor & Backend Proxy
+### 2. Interactive Voice-Based Task Creator (Human-like AI)
+- **One-Click Microphone Trigger**: Prominent mic button in the header (`Voice Add`) and inside the quick-add input allows instant activation.
+- **Natural Conversational Intelligence**: Powered by Google Gemini (`gemini-2.5-flash` via `POST /api/ai/voice-dialogue`) with a warm, colloquial, empathetic persona.
+- **Human Dialogue Flow**: Never sounds like a rigid form robot. Greets warmly, clarifies missing details (e.g. asking when you want to get it done, or suggesting appropriate project folders like Work or Personal), and asks for natural confirmation before saving.
+- **Hands-Free Continuous Turn-Taking**: Once started, speech synthesis responds with natural pitch/rate cadence and automatically transitions back to listening hands-free until the user confirms or finishes.
+- **Visual Feedback**: Pulsing glowing audio waveform visualizer reflecting active listening, speaking, thinking, and saved states.
+- **Accessibility & Resiliency**: Real-time transcript stream, live task preview card, manual mic mute toggle, and text input fallback.
+- **Instant Persistence**: Confirmed voice tasks are committed immediately to browser IndexedDB and rendered reactively across task lists and filter counts.
+
+### 3. Google Gemini AI Workload Advisor & Backend Proxy
 - **Secure Architecture**: Lightweight Node.js/Express backend proxy (`server/`) keeps `GEMINI_API_KEY` isolated from client bundles.
 - **Overcommitment Detection**: Proactively detects when a user is overcommitted on any specific date (>4 tasks or high cognitive load).
 - **Interactive AI Assistant Drawer**: Slide-out drawer with a 7-day capacity visualizer, conversational scheduling advice, and one-click rebalance suggestions.
-- **Heuristic Fallback Engine**: Deterministic offline/keyless engine ensures the UI and rebalancing work seamlessly even when no API key is set or when offline.
+- **Heuristic Fallback Engine**: Deterministic offline/keyless engine ensures the UI, voice dialogue, and rebalancing work seamlessly even when no API key is set or when offline.
 
-### 3. Cursor-Style Automated Bugbot
+### 4. Cursor-Style Automated Bugbot
 - **Workflow**: Automated GitHub Actions review bot ([`.github/workflows/bugbot.yml`](.github/workflows/bugbot.yml)).
 - **Intelligent Inspection**: Extracts bounded git diffs (50KB safety clamp) and prompts Gemini (`gemini-2.5-flash`) to review for:
   - Logic flaws & async race conditions
@@ -35,8 +44,9 @@ A high-trust, responsive React + TypeScript Todo application styled with Tailwin
   - Regressions & breaking API contracts
 - **Sticky PR Summaries**: Idempotent comments posted directly on GitHub pull requests.
 
-### 4. Chrome DevTools Protocol (CDP) & Multi-Layer Verification
-- **Unit & Integration Suite**: 34 Vitest tests covering repositories, optimistic state rollback closures, date calculations, and Express routes.
+### 5. Chrome DevTools Protocol (CDP) & Multi-Layer Verification
+- **Unit & Integration Suite**: 44 Vitest tests covering repositories, voice dialogue heuristic parsing, optimistic state rollback closures, date calculations, and Express routes.
+
 - **Direct Chrome DevTools Protocol Tests**: Playwright harness interacting directly with Chrome's native `IndexedDB` CDP domain ([`tests/cdp/cdpHelper.ts`](tests/cdp/cdpHelper.ts)) to verify on-disk object store records and reload persistence.
 - **GitHub Actions CI Pipeline**: Complete 3-stage CI pipeline ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) running ESLint, TypeScript typecheck, Vitest, and headless Chrome CDP verification on push and PR.
 

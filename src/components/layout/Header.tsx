@@ -1,6 +1,6 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
-import { Menu, Plus, Search, Sparkles, CheckSquare } from 'lucide-react';
+import { Menu, Plus, Search, Sparkles, CheckSquare, Mic } from 'lucide-react';
 
 export const Header: React.FC = () => {
   const {
@@ -10,8 +10,10 @@ export const Header: React.FC = () => {
     setIsSidebarOpen,
     isAIDrawerOpen,
     setIsAIDrawerOpen,
+    setIsVoiceModalOpen,
     taskCounts,
   } = useApp();
+
 
   return (
     <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-slate-200">
@@ -51,6 +53,18 @@ export const Header: React.FC = () => {
 
         {/* Right: Actions */}
         <div className="flex items-center gap-2">
+          {/* Voice Task Creator Trigger */}
+          <button
+            type="button"
+            data-testid="voice-task-trigger"
+            onClick={() => setIsVoiceModalOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-rose-500 to-indigo-600 hover:from-rose-600 hover:to-indigo-700 text-white text-sm font-medium shadow-sm transition-all shadow-rose-500/10"
+            title="Create task with Voice"
+          >
+            <Mic className="w-4 h-4 animate-pulse" />
+            <span className="hidden sm:inline">Voice Add</span>
+          </button>
+
           {/* New Task Modal Trigger */}
           <button
             type="button"
@@ -61,6 +75,7 @@ export const Header: React.FC = () => {
             <Plus className="w-4 h-4" />
             <span className="hidden sm:inline">New Task</span>
           </button>
+
 
           {/* AI Drawer Trigger */}
           <button

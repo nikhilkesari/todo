@@ -4,6 +4,8 @@ import {
   WorkloadAnalysisResponse,
   RescheduleSuggestionsResponse,
   DecomposeTaskResponse,
+  VoiceChatMessage,
+  VoiceDialogueResponse,
 } from '../types/ai';
 import { HeuristicEngine } from './heuristicEngine';
 
@@ -172,6 +174,75 @@ Respond in strict JSON:
       return HeuristicEngine.decomposeTask(title, description, estimatedMinutes);
     }
   }
+
+  async handleVoiceDialogue(
+    messages: VoiceChatMessage[],
+    currentDate: string,
+    projects: Array<{ id: string; name: string }> = []
+  ): Promise<VoiceDialogueResponse> {
+    if (!this.client) {
+      return HeuristicEngine.handleVoiceDialogue(messages, currentDate, projects);
+    }
+
+    try {
+      const prompt = `You are a warm, thoughtful, natural human personal assistant for a Todo application.
+Your goal is to help the user capture and organize tasks through a natural voice conversation.
+The user is talking directly to you. Your reply will be spoken out loud using text-to-speech.
+
+Current local date: ${currentDate}
+Available Projects: ${JSON.stringify(projects)}
+
+Conversation History:
+${JSON.stringify(messages, null, 2)}
+
+Strict Conversation Guidelines:
+1. Speak naturally, warmly, and succinctly (1-2 sentences maximum per turn). You are speaking to a person who is listening to you read this out loud.
+2. Avoid robotic or template-sounding phrases like "Task created. Title: X, Date: Y". Talk like a warm, supportive colleague.
+3. Understand natural speech and relative dates ("tomorrow afternoon", "this Friday", "next week", "in 2 days", "tonight"). Calculate exact YYYY-MM-DD based on currentDate.
+4. If the user mentions a project (e.g. "Work", "Personal", "Groceries"), match it to the project list ID.
+5. If details are missing or ambiguous (e.g. no due date, or project isn't clear), ask a friendly clarifying question.
+6. When all details are gathered, warmly ask for confirmation before finalizing (e.g. "I've got 'Schedule dental checkup' for this Thursday under Personal. Shall I add that?").
+7. When the user confirms (e.g., "yes", "sounds good", "go for it", "please do", "add it"), set isComplete: true, action: 'complete', and give a warm confirmation message.
+8. If the user cancels (e.g., "cancel", "never mind", "forget it"), set action: 'cancel', isComplete: false.
+
+Output JSON format (valid JSON only, no markdown wrapping):
+{
+  "reply": "string (the natural conversational response to speak back)",
+  "isComplete": boolean,
+  "action": "clarify" | "confirm" | "complete" | "cancel" | "chat",
+  "extractedTask": {
+    "title": "task title",
+    "description": "optional description",
+    "dueDate": "YYYY-MM-DD or undefined",
+    "projectId": "project id or inbox",
+    "priority": "low" | "medium" | "high"
+  },
+  "suggestedFollowUp": "optional hint"
+}`;
+
+      const response = await this.client.models.generateContent({
+        model: this.model,
+        contents: prompt,
+      });
+
+      const text = response.text?.trim() || '';
+      const cleanJson = text.replace(/^```json/, '').replace(/^```/, '').replace(/```$/, '').trim();
+      const parsed = JSON.parse(cleanJson);
+
+      return {
+        status: 'success',
+        reply: parsed.reply || "I've updated your tasks.",
+        isComplete: !!parsed.isComplete,
+        action: parsed.action || 'chat',
+        extractedTask: parsed.extractedTask,
+        suggestedFollowUp: parsed.suggestedFollowUp,
+      };
+    } catch (err) {
+      console.warn('Gemini voice dialogue failed or rate-limited; falling back to heuristic engine:', err);
+      return HeuristicEngine.handleVoiceDialogue(messages, currentDate, projects);
+    }
+  }
 }
 
 export const geminiService = new GeminiService();
+

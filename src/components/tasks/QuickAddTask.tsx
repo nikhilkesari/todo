@@ -2,11 +2,12 @@ import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Priority } from '../../types';
 import { getTodayDateString } from '../../utils/dateUtils';
-import { Plus, Calendar, Flag } from 'lucide-react';
+import { Plus, Calendar, Flag, Mic } from 'lucide-react';
 import { cn } from '../../utils/cn';
 
 export const QuickAddTask: React.FC = () => {
-  const { addTask, selectedProjectId, quickFilter } = useApp();
+  const { addTask, selectedProjectId, quickFilter, setIsVoiceModalOpen } = useApp();
+
   const [title, setTitle] = useState('');
   const [priority, setPriority] = useState<Priority>('medium');
   const [dueDate, setDueDate] = useState<string>(
@@ -62,6 +63,16 @@ export const QuickAddTask: React.FC = () => {
         />
 
         <button
+          type="button"
+          data-testid="quick-add-voice-btn"
+          onClick={() => setIsVoiceModalOpen(true)}
+          className="inline-flex items-center justify-center p-2 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+          title="Add task with Voice"
+        >
+          <Mic className="w-4 h-4" />
+        </button>
+
+        <button
           type="submit"
           data-testid="quick-add-submit"
           disabled={!title.trim() || isSubmitting}
@@ -70,6 +81,7 @@ export const QuickAddTask: React.FC = () => {
           <Plus className="w-4 h-4" />
           <span className="hidden sm:inline">Add</span>
         </button>
+
       </div>
 
       {isExpanded && (

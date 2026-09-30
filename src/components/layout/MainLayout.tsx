@@ -7,7 +7,9 @@ import { TaskList } from '../tasks/TaskList';
 import { EditTaskModal } from '../tasks/EditTaskModal';
 import { AddProjectModal } from '../projects/AddProjectModal';
 import { AIAssistantDrawer } from '../ai/AIAssistantDrawer';
+import { VoiceTaskModal } from '../voice/VoiceTaskModal';
 import { TaskSortBy } from '../../types';
+
 import { SlidersHorizontal } from 'lucide-react';
 
 export const MainLayout: React.FC = () => {
@@ -116,6 +118,8 @@ export const MainLayout: React.FC = () => {
       <EditTaskModal />
       <AddProjectModal />
       <AIAssistantDrawer />
+      <VoiceTaskModal />
     </div>
   );
 };
+

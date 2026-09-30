@@ -55,3 +55,28 @@ export interface DecomposeTaskResponse {
     estimatedMinutes: number;
   }>;
 }
+
+export interface VoiceChatMessage {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+}
+
+export interface ExtractedTaskData {
+  title?: string;
+  description?: string;
+
+  dueDate?: string; // ISO YYYY-MM-DD
+  projectId?: string;
+  priority?: 'low' | 'medium' | 'high';
+  estimatedMinutes?: number;
+}
+
+export interface VoiceDialogueResponse {
+  status: 'success' | 'fallback';
+  reply: string;
+  isComplete: boolean;
+  action: 'clarify' | 'confirm' | 'complete' | 'cancel' | 'chat';
+  extractedTask?: ExtractedTaskData;
+  suggestedFollowUp?: string;
+}
+

@@ -62,3 +62,28 @@ export interface FilterState {
   sortBy: TaskSortBy;
   hideCompleted: boolean;
 }
+
+export interface VoiceChatMessage {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+}
+
+export interface ExtractedVoiceTask {
+  title?: string;
+  description?: string;
+
+  dueDate?: string; // YYYY-MM-DD
+  projectId?: string;
+  priority?: Priority;
+  estimatedMinutes?: number;
+}
+
+export interface VoiceDialogueResponse {
+  status: 'success' | 'fallback';
+  reply: string;
+  isComplete: boolean;
+  action: 'clarify' | 'confirm' | 'complete' | 'cancel' | 'chat';
+  extractedTask?: ExtractedVoiceTask;
+  suggestedFollowUp?: string;
+}
+

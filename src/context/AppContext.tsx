@@ -23,6 +23,7 @@ interface AppContextType {
   isProjectModalOpen: boolean;
   isSidebarOpen: boolean;
   isAIDrawerOpen: boolean;
+  isVoiceModalOpen: boolean;
 
   // Actions
   addTask: (input: TaskCreateInput) => Promise<Task>;
@@ -43,6 +44,8 @@ interface AppContextType {
   setIsProjectModalOpen: (open: boolean) => void;
   setIsSidebarOpen: (open: boolean) => void;
   setIsAIDrawerOpen: (open: boolean) => void;
+  setIsVoiceModalOpen: (open: boolean) => void;
+
 
   // Computed
   filteredTasks: Task[];
@@ -74,6 +77,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isProjectModalOpen, setIsProjectModalOpen] = useState<boolean>(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
   const [isAIDrawerOpen, setIsAIDrawerOpen] = useState<boolean>(false);
+  const [isVoiceModalOpen, setIsVoiceModalOpen] = useState<boolean>(false);
+
 
   // Initialize DB and load initial data
   const loadData = useCallback(async () => {
@@ -435,7 +440,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setIsProjectModalOpen,
     setIsSidebarOpen,
     setIsAIDrawerOpen,
+    isVoiceModalOpen,
+    setIsVoiceModalOpen,
     filteredTasks,
+
     taskCounts,
     projectCounts,
   };

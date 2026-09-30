@@ -52,4 +52,26 @@ router.post('/ai/decompose-task', async (req: Request, res: Response, next: Next
   }
 });
 
+router.post('/ai/voice-dialogue', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { messages, currentDate, projects } = req.body as {
+      messages: import('../types/ai').VoiceChatMessage[];
+      currentDate?: string;
+      projects?: Array<{ id: string; name: string }>;
+    };
+
+    if (!Array.isArray(messages)) {
+      res.status(400).json({ error: 'Body must include an array of messages' });
+      return;
+    }
+
+    const today = currentDate || new Date().toISOString().split('T')[0];
+    const result = await geminiService.handleVoiceDialogue(messages, today, projects || []);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
 export default router;
+

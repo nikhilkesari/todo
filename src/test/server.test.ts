@@ -58,4 +58,70 @@ describe('Express Backend Proxy Server', () => {
     expect(Array.isArray(res.body.subtasks)).toBe(true);
     expect(res.body.subtasks.length).toBeGreaterThanOrEqual(3);
   });
+
+  it('POST /api/ai/voice-dialogue rejects empty payload without messages array', async () => {
+    const res = await request(app).post('/api/ai/voice-dialogue').send({});
+    expect(res.status).toBe(400);
+  });
+
+  it('POST /api/ai/voice-dialogue processes multi-turn conversation and confirms task', async () => {
+    // Turn 1: User mentions a task
+    const turn1Res = await request(app)
+      .post('/api/ai/voice-dialogue')
+      .send({
+        messages: [{ role: 'user', content: 'Remind me to buy groceries tomorrow under Personal' }],
+        currentDate: '2026-09-27',
+        projects: [
+          { id: 'personal', name: 'Personal' },
+          { id: 'work', name: 'Work' },
+        ],
+      });
+
+    expect(turn1Res.status).toBe(200);
+    expect(typeof turn1Res.body.reply).toBe('string');
+    expect(turn1Res.body.reply.length).toBeGreaterThan(0);
+    expect(turn1Res.body.action).toBe('confirm');
+    expect(turn1Res.body.extractedTask?.title).toContain('Buy groceries');
+    expect(turn1Res.body.extractedTask?.dueDate).toBe('2026-09-28');
+
+    // Turn 2: User confirms
+    const turn2Res = await request(app)
+      .post('/api/ai/voice-dialogue')
+      .send({
+        messages: [
+          { role: 'user', content: 'Remind me to buy groceries tomorrow under Personal' },
+          { role: 'assistant', content: turn1Res.body.reply },
+          { role: 'user', content: 'Yes, that looks perfect, please add it!' },
+        ],
+        currentDate: '2026-09-27',
+        projects: [
+          { id: 'personal', name: 'Personal' },
+          { id: 'work', name: 'Work' },
+        ],
+      });
+
+    expect(turn2Res.status).toBe(200);
+    expect(turn2Res.body.isComplete).toBe(true);
+    expect(turn2Res.body.action).toBe('complete');
+    expect(turn2Res.body.extractedTask).toBeDefined();
+    expect(turn2Res.body.extractedTask?.title).toContain('Buy groceries');
+  });
+
+  it('POST /api/ai/voice-dialogue handles user cancellation warmly', async () => {
+    const res = await request(app)
+      .post('/api/ai/voice-dialogue')
+      .send({
+        messages: [
+          { role: 'user', content: 'Add task to call the dentist' },
+          { role: 'user', content: 'Actually never mind, cancel that' },
+        ],
+        currentDate: '2026-09-27',
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.action).toBe('cancel');
+    expect(res.body.isComplete).toBe(false);
+    expect(res.body.reply.toLowerCase()).toContain('cancel');
+  });
 });
+
