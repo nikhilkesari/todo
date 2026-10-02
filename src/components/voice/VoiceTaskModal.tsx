@@ -3,7 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { useVoiceConversation, VoiceState } from '../../hooks/useVoiceConversation';
 import {
   Mic,
-  MicOff,
+  Square,
   Volume2,
   X,
   Send,
@@ -29,11 +29,13 @@ export const VoiceTaskModal: React.FC = () => {
     extractedTask,
     errorMessage,
     isSupported,
+    isListening,
     toggleMic,
     sendMessage,
     confirmTask,
     resetConversation,
   } = useVoiceConversation(isVoiceModalOpen);
+
 
   // Auto-scroll chat to bottom
   useEffect(() => {
@@ -172,15 +174,15 @@ export const VoiceTaskModal: React.FC = () => {
             ))}
           </div>
           <span className="text-xs text-slate-500 mt-2 font-medium">
-            {state === 'listening'
-              ? 'Speaking is active — say your task or reply naturally'
+            {isListening
+              ? 'Listening continuously... Speak naturally, then tap the button to stop'
               : state === 'speaking'
-              ? 'Assistant is speaking'
+              ? 'Assistant is speaking...'
               : state === 'thinking'
               ? 'Understanding your request...'
               : state === 'complete'
               ? 'Task created successfully!'
-              : 'Tap microphone or speak hands-free'}
+              : 'Tap microphone to start listening, or type below'}
           </span>
         </div>
 
@@ -211,14 +213,19 @@ export const VoiceTaskModal: React.FC = () => {
             </div>
           ))}
 
-          {/* Interim transcript while user speaks */}
+          {/* Live interim transcript while user speaks */}
           {interimTranscript && (
             <div className="flex justify-end">
-              <div className="max-w-[85%] rounded-2xl rounded-br-none px-4 py-2 bg-brand-50 border border-brand-200 text-brand-800 italic text-xs animate-pulse">
-                &ldquo;{interimTranscript}...&rdquo;
+              <div className="max-w-[85%] rounded-2xl rounded-br-none px-4 py-2.5 bg-rose-50 border border-rose-200 text-rose-900 text-xs shadow-sm flex flex-col gap-1">
+                <div className="flex items-center gap-1.5 font-semibold text-[10px] text-rose-600 uppercase tracking-wider">
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" />
+                  Live Voice Input (tap mic to stop & send)
+                </div>
+                <div className="italic font-medium">&ldquo;{interimTranscript}&rdquo;</div>
               </div>
             </div>
           )}
+
 
           {errorMessage && (
             <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-center gap-2">
@@ -289,24 +296,31 @@ export const VoiceTaskModal: React.FC = () => {
             </button>
 
             {/* Central Mic Button */}
-            <button
-              type="button"
-              data-testid="toggle-voice-mic-btn"
-              onClick={toggleMic}
-              className={cn(
-                'relative w-14 h-14 rounded-full flex items-center justify-center text-white shadow-lg transition-transform active:scale-95',
-                state === 'listening'
-                  ? 'bg-rose-500 hover:bg-rose-600 ring-4 ring-rose-200 animate-pulse'
-                  : 'bg-brand-600 hover:bg-brand-700 ring-2 ring-brand-100'
-              )}
-              aria-label={state === 'listening' ? 'Mute microphone' : 'Start talking'}
-            >
-              {state === 'listening' ? (
-                <Mic className="w-7 h-7 text-white" />
-              ) : (
-                <MicOff className="w-6 h-6 text-white" />
-              )}
-            </button>
+            <div className="flex flex-col items-center gap-1">
+              <button
+                type="button"
+                data-testid="toggle-voice-mic-btn"
+                onClick={toggleMic}
+                className={cn(
+                  'relative w-14 h-14 rounded-full flex items-center justify-center text-white shadow-lg transition-transform active:scale-95',
+                  isListening
+                    ? 'bg-rose-500 hover:bg-rose-600 ring-4 ring-rose-200 animate-pulse'
+                    : 'bg-brand-600 hover:bg-brand-700 ring-2 ring-brand-100'
+                )}
+                aria-label={isListening ? 'Stop listening' : 'Start listening'}
+                title={isListening ? 'Click to stop listening and send' : 'Click to start listening'}
+              >
+                {isListening ? (
+                  <Square className="w-5 h-5 text-white fill-current" />
+                ) : (
+                  <Mic className="w-7 h-7 text-white" />
+                )}
+              </button>
+              <span className="text-[10px] font-medium text-slate-500 select-none">
+                {isListening ? 'Tap to stop' : 'Tap to talk'}
+              </span>
+            </div>
+
 
             {state === 'complete' ? (
               <button

@@ -46,7 +46,6 @@ export function useVoiceConversation(isOpen: boolean) {
   const [extractedTask, setExtractedTask] = useState<ExtractedVoiceTask | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSupported, setIsSupported] = useState<boolean>(true);
-  const [isMicMuted, setIsMicMuted] = useState<boolean>(false);
 
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const isSpeakingRef = useRef<boolean>(false);
@@ -54,13 +53,17 @@ export function useVoiceConversation(isOpen: boolean) {
   const isMountedRef = useRef<boolean>(true);
   const isCompleteRef = useRef<boolean>(false);
   const prevIsOpenRef = useRef<boolean>(false);
+
+  // Persistent listening tracking
+  const userWantsListeningRef = useRef<boolean>(false);
+  const accumulatedSpeechRef = useRef<string>('');
+  const interimSpeechRef = useRef<string>('');
+
   const messagesRef = useRef<VoiceChatMessage[]>([]);
   const projectsRef = useRef(projects);
-  const isMicMutedRef = useRef(isMicMuted);
 
   messagesRef.current = messages;
   projectsRef.current = projects;
-  isMicMutedRef.current = isMicMuted;
 
   // Pick natural voice for speech synthesis
   const getNaturalVoice = useCallback((): SpeechSynthesisVoice | null => {
@@ -165,28 +168,13 @@ export function useVoiceConversation(isOpen: boolean) {
     [cancelSpeech, getNaturalVoice]
   );
 
-  // Stop listening
-  const stopListening = useCallback(() => {
-    if (recognitionRef.current && isListeningRef.current) {
-      try {
-        recognitionRef.current.stop();
-      } catch {
-        // ignore
-      }
-      isListeningRef.current = false;
-    }
-    setState((curr) => (curr === 'listening' ? 'idle' : curr));
-  }, []);
-
-  // Process turn
+  // Process a completed turn of user speech
   const processTurn = useCallback(
     async (userText: string) => {
       const trimmed = userText.trim();
       if (!trimmed) return;
 
-      stopListening();
       cancelSpeech();
-
       setState('thinking');
       setInterimTranscript('');
 
@@ -245,10 +233,9 @@ export function useVoiceConversation(isOpen: boolean) {
             }
           });
         } else {
+          // Assistant spoke response (clarification or confirmation)
           speakText(response.reply, () => {
-            if (isMountedRef.current && !isMicMutedRef.current && !isCompleteRef.current) {
-              startListening();
-            } else if (isMountedRef.current) {
+            if (isMountedRef.current && !isCompleteRef.current) {
               setState('idle');
             }
           });
@@ -259,111 +246,158 @@ export function useVoiceConversation(isOpen: boolean) {
           const fallbackMsg = "I'm having a little trouble connecting. Could you please say that once more?";
           setMessages((prev) => [...prev, { role: 'assistant', content: fallbackMsg }]);
           speakText(fallbackMsg, () => {
-            if (isMountedRef.current && !isMicMutedRef.current) {
-              startListening();
+            if (isMountedRef.current) {
+              setState('idle');
             }
           });
         }
       }
     },
-    [addTask, cancelSpeech, speakText, stopListening]
+    [addTask, cancelSpeech, speakText]
   );
 
+  // Helper to initialize or retrieve the speech recognition instance
+  const getOrCreateRecognition = useCallback(() => {
+    if (recognitionRef.current) return recognitionRef.current;
 
-  // Start speech recognition
-  const startListening = useCallback(() => {
-    if (isSpeakingRef.current) {
-      cancelSpeech();
+    const SpeechRecognitionCtor =
+      typeof window !== 'undefined' &&
+      ((window as unknown as { SpeechRecognition?: new () => SpeechRecognitionInstance }).SpeechRecognition ||
+        (window as unknown as { webkitSpeechRecognition?: new () => SpeechRecognitionInstance }).webkitSpeechRecognition);
+
+    if (!SpeechRecognitionCtor) {
+      setIsSupported(false);
+      return null;
     }
 
-    if (!recognitionRef.current) {
-      const SpeechRecognitionCtor =
-        typeof window !== 'undefined' &&
-        ((window as unknown as { SpeechRecognition?: new () => SpeechRecognitionInstance }).SpeechRecognition ||
-          (window as unknown as { webkitSpeechRecognition?: new () => SpeechRecognitionInstance }).webkitSpeechRecognition);
+    const rec = new SpeechRecognitionCtor();
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.lang = 'en-US';
 
-      if (!SpeechRecognitionCtor) {
-        setIsSupported(false);
-        setState((curr) => (curr === 'listening' ? 'idle' : curr));
+    rec.onstart = () => {
+      isListeningRef.current = true;
+      setState('listening');
+      setErrorMessage(null);
+    };
+
+    rec.onresult = (event: SpeechRecognitionEventLike) => {
+      let interim = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const result = event.results[i];
+        const transcript = result[0]?.transcript || '';
+        if (result.isFinal) {
+          accumulatedSpeechRef.current = (accumulatedSpeechRef.current + ' ' + transcript).trim();
+        } else {
+          interim += transcript;
+        }
+      }
+      interimSpeechRef.current = interim;
+      const combined = (accumulatedSpeechRef.current + ' ' + interim).trim();
+      setInterimTranscript(combined);
+    };
+
+    rec.onerror = (event: SpeechRecognitionErrorEventLike) => {
+      // Ignore 'no-speech' pauses: user is allowed to pause while talking persistently
+      if (event.error === 'no-speech') {
         return;
       }
-
-      const rec = new SpeechRecognitionCtor();
-      rec.continuous = false;
-      rec.interimResults = true;
-      rec.lang = 'en-US';
-
-      rec.onstart = () => {
-        isListeningRef.current = true;
-        setState('listening');
-        setErrorMessage(null);
-      };
-
-      rec.onresult = (event: SpeechRecognitionEventLike) => {
-        let interim = '';
-        let final = '';
-
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          const result = event.results[i];
-          const transcript = result[0]?.transcript || '';
-          if (result.isFinal) {
-            final += transcript;
-          } else {
-            interim += transcript;
-          }
-        }
-
-        if (interim) {
-          setInterimTranscript(interim);
-        }
-
-        if (final.trim()) {
-          setInterimTranscript('');
-          processTurn(final.trim());
-        }
-      };
-
-      rec.onerror = (event: SpeechRecognitionErrorEventLike) => {
+      if (event.error === 'not-allowed') {
+        userWantsListeningRef.current = false;
         isListeningRef.current = false;
-        if (event.error === 'no-speech') {
-          setState((curr) => (curr === 'listening' ? 'idle' : curr));
-        } else if (event.error === 'not-allowed') {
-          setErrorMessage('Microphone access denied. Please enable mic permissions or type below.');
-          setState('error');
-        } else {
-          setState((curr) => (curr === 'listening' ? 'idle' : curr));
-        }
-      };
+        setErrorMessage('Microphone access denied. Please enable mic permissions or type below.');
+        setState('error');
+        return;
+      }
+      console.warn('Speech recognition notice:', event.error);
+    };
 
-      rec.onend = () => {
-        isListeningRef.current = false;
+    rec.onend = () => {
+      isListeningRef.current = false;
+      // If user still wants listening (did NOT press stop button), restart immediately!
+      if (userWantsListeningRef.current && isMountedRef.current) {
+        try {
+          rec.start();
+          isListeningRef.current = true;
+          setState('listening');
+        } catch {
+          setTimeout(() => {
+            if (userWantsListeningRef.current && isMountedRef.current) {
+              try {
+                rec.start();
+                isListeningRef.current = true;
+                setState('listening');
+              } catch {
+                // ignore
+              }
+            }
+          }, 150);
+        }
+      } else {
         setState((curr) => (curr === 'listening' ? 'idle' : curr));
-      };
+      }
+    };
 
-      recognitionRef.current = rec;
-    }
+    recognitionRef.current = rec;
+    return rec;
+  }, []);
+
+  // Start persistent listening
+  const startListening = useCallback(() => {
+    cancelSpeech();
+    userWantsListeningRef.current = true;
+    accumulatedSpeechRef.current = '';
+    interimSpeechRef.current = '';
+    setInterimTranscript('');
+    setErrorMessage(null);
+
+    const rec = getOrCreateRecognition();
+    if (!rec) return;
 
     try {
-      recognitionRef.current.start();
+      rec.start();
+      isListeningRef.current = true;
+      setState('listening');
     } catch {
-      // ignore
+      isListeningRef.current = true;
+      setState('listening');
     }
-  }, [cancelSpeech, processTurn]);
+  }, [cancelSpeech, getOrCreateRecognition]);
 
-  // Toggle mic
-  const toggleMic = useCallback(() => {
-    setState((curr) => {
-      if (curr === 'listening') {
-        stopListening();
-        setIsMicMuted(true);
-        return 'idle';
-      } else {
-        setIsMicMuted(false);
-        startListening();
-        return curr;
+  // Stop persistent listening and process the captured speech
+  const stopListening = useCallback(() => {
+    userWantsListeningRef.current = false;
+    isListeningRef.current = false;
+
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch {
+        // ignore
       }
-    });
-  }, [startListening, stopListening]);
+    }
+
+    setState('idle');
+
+    // Retrieve entire captured transcript from this persistent session
+    const fullText = (accumulatedSpeechRef.current + ' ' + interimSpeechRef.current).trim();
+    accumulatedSpeechRef.current = '';
+    interimSpeechRef.current = '';
+    setInterimTranscript('');
+
+    if (fullText) {
+      processTurn(fullText);
+    }
+  }, [processTurn]);
+
+  // Toggle persistent listening on/off with button press
+  const toggleMic = useCallback(() => {
+    if (state === 'listening' || isListeningRef.current || userWantsListeningRef.current) {
+      stopListening();
+    } else {
+      startListening();
+    }
+  }, [state, startListening, stopListening]);
 
   // Manual task confirmation
   const confirmTask = useCallback(async () => {
@@ -399,7 +433,15 @@ export function useVoiceConversation(isOpen: boolean) {
   // Reset conversation
   const resetConversation = useCallback(() => {
     cancelSpeech();
-    stopListening();
+    userWantsListeningRef.current = false;
+    isListeningRef.current = false;
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch {
+        // ignore
+      }
+    }
     isCompleteRef.current = false;
     setExtractedTask(null);
     setInterimTranscript('');
@@ -412,12 +454,9 @@ export function useVoiceConversation(isOpen: boolean) {
     setMessages([greeting]);
     setState('idle');
 
-    speakText(greeting.content, () => {
-      if (isMountedRef.current && !isMicMutedRef.current) {
-        startListening();
-      }
-    });
-  }, [cancelSpeech, stopListening, speakText, startListening]);
+    // Automatically start listening persistently upon opening so user can talk immediately!
+    startListening();
+  }, [cancelSpeech, startListening]);
 
   // Only trigger reset when isOpen transitions from false to true
   useEffect(() => {
@@ -432,26 +471,50 @@ export function useVoiceConversation(isOpen: boolean) {
       resetConversation();
     } else if (!isOpen && prevIsOpenRef.current) {
       cancelSpeech();
-      stopListening();
+      userWantsListeningRef.current = false;
+      isListeningRef.current = false;
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch {
+          // ignore
+        }
+      }
     }
     prevIsOpenRef.current = isOpen;
 
     return () => {
       if (!isOpen) {
         cancelSpeech();
-        stopListening();
+        userWantsListeningRef.current = false;
+        isListeningRef.current = false;
+        if (recognitionRef.current) {
+          try {
+            recognitionRef.current.stop();
+          } catch {
+            // ignore
+          }
+        }
       }
     };
-  }, [isOpen, resetConversation, cancelSpeech, stopListening]);
+  }, [isOpen, resetConversation, cancelSpeech]);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       isMountedRef.current = false;
       cancelSpeech();
-      stopListening();
+      userWantsListeningRef.current = false;
+      isListeningRef.current = false;
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch {
+          // ignore
+        }
+      }
     };
-  }, [cancelSpeech, stopListening]);
+  }, [cancelSpeech]);
 
   return {
     state,
@@ -460,7 +523,7 @@ export function useVoiceConversation(isOpen: boolean) {
     extractedTask,
     errorMessage,
     isSupported,
-    isMicMuted,
+    isListening: state === 'listening' || isListeningRef.current || userWantsListeningRef.current,
     startListening,
     stopListening,
     toggleMic,

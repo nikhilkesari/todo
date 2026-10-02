@@ -19,6 +19,33 @@ test.describe('Voice Conversational Task Creator (One-Click Human-like AI)', () 
             }, 10);
           };
         }
+
+        class MockSpeechRecognition {
+          continuous = true;
+          interimResults = true;
+          lang = 'en-US';
+          onstart: (() => void) | null = null;
+          onend: (() => void) | null = null;
+          onerror: ((e: unknown) => void) | null = null;
+          onresult: ((e: unknown) => void) | null = null;
+          start() {
+            setTimeout(() => {
+              this.onstart?.();
+            }, 10);
+          }
+          stop() {
+            setTimeout(() => {
+              this.onend?.();
+            }, 10);
+          }
+          abort() {
+            setTimeout(() => {
+              this.onend?.();
+            }, 10);
+          }
+        }
+        (window as any).SpeechRecognition = MockSpeechRecognition;
+        (window as any).webkitSpeechRecognition = MockSpeechRecognition;
       }
     });
 
@@ -182,4 +209,37 @@ test.describe('Voice Conversational Task Creator (One-Click Human-like AI)', () 
     const unaddedTask = page.locator('[data-testid^="task-title-"]', { hasText: cancelTitle });
     await expect(unaddedTask).toHaveCount(0);
   });
+
+  test('VOICE-06: Verifies voice button is persistent (starts listening when pressed, stays listening across silence/pauses, and stops when pressed again)', async ({ page }) => {
+    // Open voice modal
+    await page.click('[data-testid="voice-task-trigger"]');
+    const modal = page.locator('[data-testid="voice-task-modal"]');
+    await expect(modal).toBeVisible();
+
+    const micBtn = page.locator('[data-testid="toggle-voice-mic-btn"]');
+    await expect(micBtn).toBeVisible();
+
+    // Verify it is in persistent listening mode
+    await expect(page.locator('text=Tap to stop')).toBeVisible();
+
+    // Wait 500ms simulating pause in user speech — verify it does NOT drop or stop listening
+    await page.waitForTimeout(500);
+    await expect(page.locator('text=Tap to stop')).toBeVisible();
+
+    // Click mic button to stop listening
+    await micBtn.click();
+    await expect(page.locator('text=Tap to talk')).toBeVisible();
+
+    // Click mic button again to start listening persistently
+    await micBtn.click();
+    await expect(page.locator('text=Tap to stop')).toBeVisible();
+
+    // Click to stop again
+    await micBtn.click();
+    await expect(page.locator('text=Tap to talk')).toBeVisible();
+
+    await page.click('[data-testid="close-voice-modal-btn"]');
+    await expect(modal).not.toBeVisible();
+  });
 });
+
