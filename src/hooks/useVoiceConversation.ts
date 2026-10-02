@@ -37,6 +37,67 @@ interface SpeechRecognitionInstance {
   onend: (() => void) | null;
 }
 
+/**
+ * Explicitly requests microphone permissions from the browser via getUserMedia.
+ * This triggers the browser's native permission prompt (e.g. "Allow localhost to use your microphone").
+ */
+export async function requestMicrophonePermission(): Promise<{ granted: boolean; error?: string }> {
+  if (typeof window === 'undefined') {
+    return { granted: false, error: 'Browser environment not available' };
+  }
+
+  // Secure context check (getUserMedia requires HTTPS or localhost)
+  if (!window.isSecureContext) {
+    return {
+      granted: false,
+      error: 'Microphone requires a secure connection (HTTPS or localhost).',
+    };
+  }
+
+  // Fast-path: Check if already granted via Permissions API
+  if (typeof navigator !== 'undefined' && navigator.permissions?.query) {
+    try {
+      const status = await navigator.permissions.query({ name: 'microphone' as PermissionName });
+      if (status.state === 'granted') {
+        return { granted: true };
+      }
+    } catch {
+      // Permissions query for 'microphone' is not supported in all browsers; fallback to getUserMedia
+    }
+  }
+
+  if (typeof navigator !== 'undefined' && navigator.mediaDevices?.getUserMedia) {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Stop all audio tracks immediately so hardware mic is released for SpeechRecognition
+      stream.getTracks().forEach((track) => track.stop());
+      // Brief pause to allow OS audio subsystem to release lock
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      return { granted: true };
+    } catch (err: unknown) {
+      const error = err as { name?: string; message?: string };
+      if (error?.name === 'NotAllowedError' || error?.name === 'PermissionDeniedError') {
+        return {
+          granted: false,
+          error:
+            'Microphone access is blocked. Please click the tune or lock icon in your browser address bar to allow microphone access, then click "Request Microphone Access".',
+        };
+      } else if (error?.name === 'NotFoundError' || error?.name === 'DevicesNotFoundError') {
+        return {
+          granted: false,
+          error: 'No microphone was found on this device. Please connect a microphone or use text input below.',
+        };
+      }
+      return {
+        granted: false,
+        error: error?.message || 'Unable to access microphone.',
+      };
+    }
+  }
+
+  return { granted: true };
+}
+
 export function useVoiceConversation(isOpen: boolean) {
   const { addTask, projects } = useApp();
 
@@ -305,7 +366,9 @@ export function useVoiceConversation(isOpen: boolean) {
       if (event.error === 'not-allowed') {
         userWantsListeningRef.current = false;
         isListeningRef.current = false;
-        setErrorMessage('Microphone access denied. Please enable mic permissions or type below.');
+        setErrorMessage(
+          'Microphone permission is required. Please click "Request Microphone Access" below or check the lock icon in your address bar.'
+        );
         setState('error');
         return;
       }
@@ -343,16 +406,34 @@ export function useVoiceConversation(isOpen: boolean) {
   }, []);
 
   // Start persistent listening
-  const startListening = useCallback(() => {
+  const startListening = useCallback(async () => {
     cancelSpeech();
+    setErrorMessage(null);
+
+    const perm = await requestMicrophonePermission();
+    if (!perm.granted) {
+      userWantsListeningRef.current = false;
+      isListeningRef.current = false;
+      setState('error');
+      if (perm.error) setErrorMessage(perm.error);
+      return;
+    }
+
     userWantsListeningRef.current = true;
     accumulatedSpeechRef.current = '';
     interimSpeechRef.current = '';
     setInterimTranscript('');
-    setErrorMessage(null);
 
     const rec = getOrCreateRecognition();
-    if (!rec) return;
+    if (!rec) {
+      userWantsListeningRef.current = false;
+      isListeningRef.current = false;
+      setState('error');
+      setErrorMessage(
+        'Speech recognition is not supported in this browser. Please use Chrome, Edge, or Safari.'
+      );
+      return;
+    }
 
     try {
       rec.start();

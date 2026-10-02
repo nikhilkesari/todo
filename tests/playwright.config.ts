@@ -35,6 +35,7 @@ export default defineConfig({
       use: {
         ...devices['Desktop Chrome'],
         channel: process.env.PLAYWRIGHT_CHANNEL || 'chrome',
+        permissions: ['microphone'],
         launchOptions: {
           headless: true,
           args: [
@@ -43,6 +44,8 @@ export default defineConfig({
             '--disable-dev-shm-usage',
             '--disable-gpu',
             '--headless=new',
+            '--use-fake-ui-for-media-stream',
+            '--use-fake-device-for-media-stream',
           ],
         },
       },

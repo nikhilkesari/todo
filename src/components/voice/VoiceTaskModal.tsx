@@ -30,6 +30,7 @@ export const VoiceTaskModal: React.FC = () => {
     errorMessage,
     isSupported,
     isListening,
+    startListening,
     toggleMic,
     sendMessage,
     confirmTask,
@@ -182,6 +183,8 @@ export const VoiceTaskModal: React.FC = () => {
               ? 'Understanding your request...'
               : state === 'complete'
               ? 'Task created successfully!'
+              : state === 'error'
+              ? 'Microphone permission needed to speak'
               : 'Tap microphone to start listening, or type below'}
           </span>
         </div>
@@ -226,11 +229,32 @@ export const VoiceTaskModal: React.FC = () => {
             </div>
           )}
 
-
           {errorMessage && (
-            <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
-              <span>{errorMessage}</span>
+            <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex flex-col gap-2">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <span className="leading-relaxed">{errorMessage}</span>
+              </div>
+              <div className="flex items-center gap-2 pt-1">
+                <button
+                  type="button"
+                  data-testid="enable-mic-btn"
+                  onClick={() => void startListening()}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-600 hover:bg-brand-700 text-white font-medium text-xs shadow-sm transition-colors"
+                >
+                  <Mic className="w-3.5 h-3.5" />
+                  Request Microphone Access
+                </button>
+              </div>
+            </div>
+          )}
+
+          {!isSupported && (
+            <div className="p-3 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 text-xs flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-slate-500 shrink-0" />
+              <span>
+                Speech recognition is not supported in this browser. Please use Chrome, Edge, or Safari, or type below.
+              </span>
             </div>
           )}
         </div>
@@ -305,10 +329,24 @@ export const VoiceTaskModal: React.FC = () => {
                   'relative w-14 h-14 rounded-full flex items-center justify-center text-white shadow-lg transition-transform active:scale-95',
                   isListening
                     ? 'bg-rose-500 hover:bg-rose-600 ring-4 ring-rose-200 animate-pulse'
+                    : state === 'error'
+                    ? 'bg-amber-600 hover:bg-amber-700 ring-2 ring-amber-100'
                     : 'bg-brand-600 hover:bg-brand-700 ring-2 ring-brand-100'
                 )}
-                aria-label={isListening ? 'Stop listening' : 'Start listening'}
-                title={isListening ? 'Click to stop listening and send' : 'Click to start listening'}
+                aria-label={
+                  isListening
+                    ? 'Stop listening'
+                    : state === 'error'
+                    ? 'Request microphone access'
+                    : 'Start listening'
+                }
+                title={
+                  isListening
+                    ? 'Click to stop listening and send'
+                    : state === 'error'
+                    ? 'Click to request microphone access'
+                    : 'Click to start listening'
+                }
               >
                 {isListening ? (
                   <Square className="w-5 h-5 text-white fill-current" />
@@ -317,7 +355,11 @@ export const VoiceTaskModal: React.FC = () => {
                 )}
               </button>
               <span className="text-[10px] font-medium text-slate-500 select-none">
-                {isListening ? 'Tap to stop' : 'Tap to talk'}
+                {isListening
+                  ? 'Tap to stop'
+                  : state === 'error'
+                  ? 'Tap to enable mic'
+                  : 'Tap to talk'}
               </span>
             </div>
 

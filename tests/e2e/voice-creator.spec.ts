@@ -20,6 +20,13 @@ test.describe('Voice Conversational Task Creator (One-Click Human-like AI)', () 
           };
         }
 
+        // Mock navigator.mediaDevices.getUserMedia in test environment
+        if (navigator.mediaDevices) {
+          navigator.mediaDevices.getUserMedia = async () => ({
+            getTracks: () => [{ stop: () => {} }],
+          } as any);
+        }
+
         class MockSpeechRecognition {
           continuous = true;
           interimResults = true;
@@ -237,6 +244,31 @@ test.describe('Voice Conversational Task Creator (One-Click Human-like AI)', () 
     // Click to stop again
     await micBtn.click();
     await expect(page.locator('text=Tap to talk')).toBeVisible();
+
+    await page.click('[data-testid="close-voice-modal-btn"]');
+    await expect(modal).not.toBeVisible();
+  });
+
+  test('VOICE-07: Microphone permission request flow and guidance', async ({ page }) => {
+    // Open voice modal
+    await page.click('[data-testid="voice-task-trigger"]');
+    const modal = page.locator('[data-testid="voice-task-modal"]');
+    await expect(modal).toBeVisible();
+
+    // Verify mic toggle button is visible and operable
+    const micBtn = page.locator('[data-testid="toggle-voice-mic-btn"]');
+    await expect(micBtn).toBeVisible();
+
+    // Initially in listening mode
+    await expect(page.locator('text=Tap to stop')).toBeVisible();
+
+    // Stop listening
+    await micBtn.click();
+    await expect(page.locator('text=Tap to talk')).toBeVisible();
+
+    // Trigger permission request / start listening by clicking mic button
+    await micBtn.click();
+    await expect(page.locator('text=Tap to stop')).toBeVisible();
 
     await page.click('[data-testid="close-voice-modal-btn"]');
     await expect(modal).not.toBeVisible();
