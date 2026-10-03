@@ -19,7 +19,7 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
   res.status(500).json({ error: err.message || 'Internal server error' });
 });
 
-if (process.env.NODE_ENV !== 'test') {
+if (!process.env.VITEST) {
   app.listen(PORT, () => {
     console.log(`Backend proxy server listening on port ${PORT}`);
   });
